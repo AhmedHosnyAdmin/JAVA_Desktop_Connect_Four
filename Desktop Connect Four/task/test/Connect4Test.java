@@ -12,10 +12,56 @@ import java.util.*;
 
 import static java.util.stream.IntStream.range;
 import static org.hyperskill.hstest.testcase.CheckResult.correct;
+import static org.hyperskill.hstest.testcase.CheckResult.wrong;
+
+
+class OsCheck {
+
+    public static void main(String[] args) {
+        System.out.println(
+                System.getProperty(
+                                "os.name", "generic")
+                        .toLowerCase(Locale.ENGLISH)
+        );
+    }
+
+    /**
+     * types of Operating Systems
+     */
+    public enum OSType {
+        Windows, MacOS, Linux, Other
+    };
+
+    // cached result of OS detection
+    protected static OSType detectedOS;
+
+    public static OSType getOperatingSystemType() {
+        if (detectedOS == null) {
+            String OS = System.getProperty(
+                            "os.name", "generic")
+                    .toLowerCase(Locale.ENGLISH);
+            if ((OS.contains("mac"))
+                    || (OS.contains("darwin"))) {
+                detectedOS = OSType.MacOS;
+            } else if (OS.contains("win")) {
+                detectedOS = OSType.Windows;
+            } else if (OS.contains("nux")) {
+                detectedOS = OSType.Linux;
+            } else {
+                detectedOS = OSType.Other;
+            }
+        }
+        return detectedOS;
+    }
+}
 
 public class Connect4Test extends SwingTest {
+    private static final String EMPTY_CELL = " ";
+    private static final String MARK_X = "X";
+    private static final String MARK_O = "O";
     private static final int NUM_OF_ROWS = 6;
     private static final int NUM_OF_COLUMNS = 7;
+    private static int playerCount = 0;
 
     public Connect4Test() {
         super(new ConnectFour());
@@ -106,33 +152,28 @@ public class Connect4Test extends SwingTest {
     @SwingComponent
     private JButtonFixture buttonG6;
 
-
     private final List<JButton> buttons = new ArrayList<>();
+    private Map<String, JButtonFixture> cells;
 
-    @DynamicTest(feedback = "The window should exit on close.")
+    @DynamicTest(feedback = "Cells should be visible")
     CheckResult test1() {
-        assertEquals(frame.getDefaultCloseOperation(), JFrame.EXIT_ON_CLOSE, "The default close operation is {0}" +
-                        " but should be {1}", defaultCloseOperationIntToString(frame.getDefaultCloseOperation()),
-                defaultCloseOperationIntToString(JFrame.EXIT_ON_CLOSE));
+        cells = cells();
+        cells.forEach((label, button) -> {
+            button.requireVisible();
+            buttons.add(button.target());
+        });
         return correct();
     }
 
-    @DynamicTest(feedback = "Buttons should have a name (ButtonA1..ButtonG6), be visible, and have the following labels: 'A1'...'G6'")
+    @DynamicTest(feedback = "Cells should be enabled")
     CheckResult test2() {
-        Map<String, JButtonFixture> board = mapOf(
-                "A6", buttonA6, "B6", buttonB6, "C6", buttonC6, "D6", buttonD6, "E6", buttonE6, "F6", buttonF6, "G6", buttonG6,
-                "A5", buttonA5, "B5", buttonB5, "C5", buttonC5, "D5", buttonD5, "E5", buttonE5, "F5", buttonF5, "G5", buttonG5,
-                "A4", buttonA4, "B4", buttonB4, "C4", buttonC4, "D4", buttonD4, "E4", buttonE4, "F4", buttonF4, "G4", buttonG4,
-                "A3", buttonA3, "B3", buttonB3, "C3", buttonC3, "D3", buttonD3, "E3", buttonE3, "F3", buttonF3, "G3", buttonG3,
-                "A2", buttonA2, "B2", buttonB2, "C2", buttonC2, "D2", buttonD2, "E2", buttonE2, "F2", buttonF2, "G2", buttonG2,
-                "A1", buttonA1, "B1", buttonB1, "C1", buttonC1, "D1", buttonD1, "E1", buttonE1, "F1", buttonF1, "G1", buttonG1);
+        cells.forEach((label, button) -> button.requireEnabled());
+        return correct();
+    }
 
-        board.forEach((label, button) -> {
-            button.requireVisible();
-            button.requireText(label);
-            buttons.add(button.target());
-        });
-
+    @DynamicTest(feedback = "All cells should display a single space (\" \") before the game starts")
+    CheckResult test3() {
+        cells.forEach((label, button) -> button.requireText(EMPTY_CELL));
         return correct();
     }
 
@@ -140,20 +181,20 @@ public class Connect4Test extends SwingTest {
     private int[] rows;
 
     @DynamicTest(feedback = "The board should have exactly six rows and seven columns")
-    CheckResult test3() {
+    CheckResult test4() {
         cols = buttons.stream().mapToInt(JButton::getX).distinct().sorted().toArray();
         rows = buttons.stream().mapToInt(JButton::getY).distinct().sorted().toArray();
 
-        assertEquals(NUM_OF_COLUMNS, cols.length,
+        assertEquals(7, cols.length,
                 "The board should have exactly 7 columns. "
-                        + "The coordinates for columns are {0}, "
-                        + "the buttons have {1} different coordinates for columns",
+                        + "The column coordinates are {0}, "
+                        + "the buttons have {1} different column coordinates",
                 Arrays.toString(cols), cols.length);
 
-        assertEquals(NUM_OF_ROWS, rows.length,
+        assertEquals(6, rows.length,
                 "The board should have exactly 6 rows. "
-                        + "The coordinates for rows are {0}, "
-                        + "The buttons have {0} different coordinates for rows",
+                        + "The row coordinates are {0}, "
+                        + "The buttons have {0} different row coordinates",
                 Arrays.toString(rows), rows.length);
 
         return correct();
@@ -163,19 +204,41 @@ public class Connect4Test extends SwingTest {
     private static final String[] COL_NAME = new String[]{"first", "second", "third", "fourth", "fifth", "sixth", "seventh"};
 
     @DynamicTest(feedback = "The buttons are incorrectly placed on the board")
-    CheckResult test4() {
+    CheckResult test5() {
         range(0, NUM_OF_ROWS * NUM_OF_COLUMNS).forEach(index -> {
 
             assertEquals(rows[index / NUM_OF_COLUMNS], buttons.get(index).getY(),
                     "The button {0} should be located in the {1} row, with the bottom row being the first row",
-                    buttons.get(index).getText(), ROW_NAME[index / NUM_OF_COLUMNS]);
+                    buttons.get(index).getName(), ROW_NAME[index / NUM_OF_COLUMNS]);
 
             assertEquals(cols[index % NUM_OF_COLUMNS], buttons.get(index).getX(),
                     "The button {0} should be located in the {1} column, with the leftmost column being the first column",
-                    buttons.get(index).getText(), COL_NAME[index % NUM_OF_COLUMNS]);
+                    buttons.get(index).getName(), COL_NAME[index % NUM_OF_COLUMNS]);
         });
 
         return correct();
+    }
+
+    @DynamicTest(feedback = "After clicking on a cell, it should contain either X or O, " +
+            "starting with X and alternating with every click on a new cell")
+    CheckResult test6() {
+        try {
+            frame.setExtendedState(JFrame.NORMAL);
+            frame.toFront();
+            cells.forEach((label, button) -> {
+                button.click();
+                button.requireText(getPlayer());
+            });
+            return correct();
+        } catch (Throwable ex) {
+            if (OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+                return wrong(
+                        "Please, make sure that Intellij Idea has access to control your mouse and keyboard: \n" +
+                                "go to System Preferences -> Security & Privacy -> Accessibility\n" +
+                                "and grant Intellij IDEA access to control your computer.");
+            }
+            throw ex;
+        }
     }
 
     private static void assertEquals(
@@ -190,6 +253,16 @@ public class Connect4Test extends SwingTest {
         }
     }
 
+    private Map<String, JButtonFixture> cells() {
+        return mapOf(
+                "A6", buttonA6, "B6", buttonB6, "C6", buttonC6, "D6", buttonD6, "E6", buttonE6, "F6", buttonF6, "G6", buttonG6,
+                "A5", buttonA5, "B5", buttonB5, "C5", buttonC5, "D5", buttonD5, "E5", buttonE5, "F5", buttonF5, "G5", buttonG5,
+                "A4", buttonA4, "B4", buttonB4, "C4", buttonC4, "D4", buttonD4, "E4", buttonE4, "F4", buttonF4, "G4", buttonG4,
+                "A3", buttonA3, "B3", buttonB3, "C3", buttonC3, "D3", buttonD3, "E3", buttonE3, "F3", buttonF3, "G3", buttonG3,
+                "A2", buttonA2, "B2", buttonB2, "C2", buttonC2, "D2", buttonD2, "E2", buttonE2, "F2", buttonF2, "G2", buttonG2,
+                "A1", buttonA1, "B1", buttonB1, "C1", buttonC1, "D1", buttonD1, "E1", buttonE1, "F1", buttonF1, "G1", buttonG1);
+    }
+
     private static Map<String, JButtonFixture> mapOf(Object... keyValues) {
         Map<String, JButtonFixture> map = new LinkedHashMap<>();
 
@@ -200,14 +273,7 @@ public class Connect4Test extends SwingTest {
         return map;
     }
 
-    private static String defaultCloseOperationIntToString(int defaultCloseOperation) {
-        return switch (defaultCloseOperation) {
-            case 0 -> "Do Nothing On Close";
-            case 1 -> "Hide On Close";
-            case 2 -> "Dispose On Close";
-            case 3 -> "Exit On Close";
-            default -> throw new IllegalArgumentException("Error in Default Close Operation test, int value of default " +
-                    "close operation not present as constant");
-        };
+    private static String getPlayer() {
+        return playerCount++ % 2 == 0 ? MARK_X : MARK_O;
     }
 }
