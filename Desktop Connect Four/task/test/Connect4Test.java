@@ -152,8 +152,9 @@ public class Connect4Test extends SwingTest {
     @SwingComponent
     private JButtonFixture buttonG6;
 
-    private final List<JButton> buttons = new ArrayList<>();
+    private static final List<JButton> buttons = new ArrayList<>();
     private Map<String, JButtonFixture> cells;
+    private static String[][] expectedArray;
 
     @DynamicTest(feedback = "Cells should be visible")
     CheckResult test1() {
@@ -219,15 +220,24 @@ public class Connect4Test extends SwingTest {
         return correct();
     }
 
-    @DynamicTest(feedback = "After clicking on a cell, it should contain either X or O, " +
-            "starting with X and alternating with every click on a new cell")
+    @DynamicTest(feedback = "After clicking on a cell, it should fill the first open cell in that column either X or O, " +
+            "starting with X and alternating with every click until the column is full")
     CheckResult test6() {
+        initializeExpectedArray();
         try {
             frame.setExtendedState(JFrame.NORMAL);
             frame.toFront();
             cells.forEach((label, button) -> {
                 button.click();
-                button.requireText(getPlayer());
+                updateExpectedArrayFromButtonClicked(button.target());
+                String[][] actualArray = getActualArray();
+                for (int i = 0; i < NUM_OF_ROWS; i++) {
+                    for (int j = 0; j < NUM_OF_COLUMNS; j++) {
+                        assertEquals(expectedArray[i][j], actualArray[i][j],
+                                "The text for the cell {0}{1} should be \"{2}\" " +
+                                        "but is instead \"{3}\"",  (char) ('A' + j), NUM_OF_ROWS - i, expectedArray[i][j], actualArray[i][j]);
+                    }
+                }
             });
             return correct();
         } catch (Throwable ex) {
@@ -273,7 +283,42 @@ public class Connect4Test extends SwingTest {
         return map;
     }
 
-    private static String getPlayer() {
+    private static String updatePlayer() {
         return playerCount++ % 2 == 0 ? MARK_X : MARK_O;
+    }
+
+
+    private static void updateExpectedArrayFromButtonClicked(JButton button) {
+        int column = getColumnFromJButton(button);
+        for (int i = NUM_OF_ROWS - 1; i >= 0; i--) {
+            if (Objects.equals(expectedArray[i][column], EMPTY_CELL)) {
+                expectedArray[i][column] = updatePlayer();
+                break;
+            }
+        }
+    }
+
+    private static void initializeExpectedArray() {
+        expectedArray = new String[NUM_OF_ROWS][NUM_OF_COLUMNS];
+        for (String[] array: expectedArray) {
+            Arrays.fill(array, EMPTY_CELL);
+        }
+    }
+
+    private static String[][] getActualArray() {
+        String[][] actualArray = new String[NUM_OF_ROWS][NUM_OF_COLUMNS];
+        buttons.forEach(button -> {
+            actualArray[getRowFromJButton(button)][getColumnFromJButton(button)]
+                    = button.getText();
+        });
+        return actualArray;
+    }
+
+    private static int getColumnFromJButton(JButton button) {
+        return buttons.indexOf(button) % NUM_OF_COLUMNS;
+    }
+
+    private static int getRowFromJButton(JButton button) {
+        return buttons.indexOf(button) / NUM_OF_COLUMNS;
     }
 }
