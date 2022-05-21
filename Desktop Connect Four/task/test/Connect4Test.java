@@ -1,4 +1,5 @@
 import four.ConnectFour;
+import org.assertj.swing.fixture.AbstractComponentFixture;
 import org.assertj.swing.fixture.JButtonFixture;
 import org.hyperskill.hstest.dynamic.DynamicTest;
 import org.hyperskill.hstest.exception.outcomes.WrongAnswer;
@@ -7,7 +8,9 @@ import org.hyperskill.hstest.testcase.CheckResult;
 import org.hyperskill.hstest.testing.swing.SwingComponent;
 
 import javax.swing.*;
+import java.awt.*;
 import java.text.MessageFormat;
+import java.util.List;
 import java.util.*;
 
 import static java.util.stream.IntStream.range;
@@ -151,30 +154,33 @@ public class Connect4Test extends SwingTest {
     private JButtonFixture buttonG5;
     @SwingComponent
     private JButtonFixture buttonG6;
+    @SwingComponent
+    private JButtonFixture buttonReset;
 
     private static final List<JButton> buttons = new ArrayList<>();
-    private Map<String, JButtonFixture> cells;
+    private static final List<JButtonFixture> buttonFixtures = new ArrayList<>();
     private static String[][] expectedArray;
 
     @DynamicTest(feedback = "Cells should be visible")
     CheckResult test1() {
-        cells = cells();
+        Map<String, JButtonFixture> cells = cells();
         cells.forEach((label, button) -> {
             button.requireVisible();
             buttons.add(button.target());
+            buttonFixtures.add(button);
         });
         return correct();
     }
 
     @DynamicTest(feedback = "Cells should be enabled")
     CheckResult test2() {
-        cells.forEach((label, button) -> button.requireEnabled());
+        buttonFixtures.forEach(AbstractComponentFixture::requireEnabled);
         return correct();
     }
 
     @DynamicTest(feedback = "All cells should display a single space (\" \") before the game starts")
     CheckResult test3() {
-        cells.forEach((label, button) -> button.requireText(EMPTY_CELL));
+        buttonFixtures.forEach(button -> button.requireText(EMPTY_CELL));
         return correct();
     }
 
@@ -209,36 +215,32 @@ public class Connect4Test extends SwingTest {
         range(0, NUM_OF_ROWS * NUM_OF_COLUMNS).forEach(index -> {
 
             assertEquals(rows[index / NUM_OF_COLUMNS], buttons.get(index).getY(),
-                    "The button {0} should be located in the {1} row, with the bottom row being the first row",
+                    "The button {0} should be located in the {1} row, with the bottom " +
+                            "row being the first row",
                     buttons.get(index).getName(), ROW_NAME[index / NUM_OF_COLUMNS]);
 
             assertEquals(cols[index % NUM_OF_COLUMNS], buttons.get(index).getX(),
-                    "The button {0} should be located in the {1} column, with the leftmost column being the first column",
+                    "The button {0} should be located in the {1} column, with the leftmost " +
+                            "column being the first column",
                     buttons.get(index).getName(), COL_NAME[index % NUM_OF_COLUMNS]);
         });
 
         return correct();
     }
 
-    @DynamicTest(feedback = "After clicking on a cell, it should fill the first open cell in that column either X or O, " +
-            "starting with X and alternating with every click until the column is full")
+    @DynamicTest(feedback = "Add a JButton with the name of 'ButtonReset' and enable it")
     CheckResult test6() {
-        initializeExpectedArray();
+        buttonReset.requireEnabled();
+        return correct();
+    }
+
+    @DynamicTest(feedback = "After the first click on the A1 cell, this cell should contain the X symbol.")
+    CheckResult test7() {
         try {
             frame.setExtendedState(JFrame.NORMAL);
             frame.toFront();
-            cells.forEach((label, button) -> {
-                button.click();
-                updateExpectedArrayFromButtonClicked(button.target());
-                String[][] actualArray = getActualArray();
-                for (int i = 0; i < NUM_OF_ROWS; i++) {
-                    for (int j = 0; j < NUM_OF_COLUMNS; j++) {
-                        assertEquals(expectedArray[i][j], actualArray[i][j],
-                                "The text for the cell {0}{1} should be \"{2}\" " +
-                                        "but is instead \"{3}\"",  (char) ('A' + j), NUM_OF_ROWS - i, expectedArray[i][j], actualArray[i][j]);
-                    }
-                }
-            });
+            buttonA1.click();
+            buttonA1.requireText(MARK_X);
             return correct();
         } catch (Throwable ex) {
             if (OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
@@ -249,6 +251,85 @@ public class Connect4Test extends SwingTest {
             }
             throw ex;
         }
+    }
+
+    @DynamicTest(feedback = "After the second click on the A2 cell, this cell should contain the O symbol.")
+    CheckResult test8() {
+        buttonA2.click();
+        buttonA2.requireText(MARK_O);
+        return correct();
+    }
+
+    @DynamicTest(feedback = "The Reset button should clear the board")
+    CheckResult test9() {
+        buttonReset.click();
+        buttonFixtures.forEach(cell -> cell.requireText(EMPTY_CELL));
+        return correct();
+    }
+
+    @DynamicTest(feedback = "Clicking on a cell in an already full column should do nothing")
+    CheckResult test10() {
+        initializeExpectedArray();
+        for (int clickCount = 0; clickCount < 8; clickCount++) {
+            buttonA6.click();
+            updateExpectedArrayFromButtonClicked(buttonA6.target());
+            String[][] actualArray = getActualArray();
+            for (int i = 0; i < NUM_OF_ROWS; i++) {
+                for (int j = 0; j < NUM_OF_COLUMNS; j++) {
+                    assertEquals(expectedArray[i][j], actualArray[i][j],
+                            "The text for the cell {0}{1} should be \"{2}\" " +
+                                    "but is instead \"{3}\"", (char) ('A' + j), NUM_OF_ROWS - i, expectedArray[i][j], actualArray[i][j]);
+                }
+            }
+        }
+        return correct();
+    }
+
+    @DynamicTest(feedback = "Incorrect state of board during play or unable to identify win condition correctly")
+    CheckResult test11() {
+        List<int[]> winConditions = winConditions();
+        for (int[] winCondition:
+                winConditions) {
+            buttonReset.click();
+            initializeExpectedArray();
+            for (int columnToClick :
+                    winCondition) {
+                for (JButtonFixture button :
+                        buttonFixtures) {
+                    if (getColumnFromJButton(button.target()) == columnToClick) {
+                        button.click();
+                        updateExpectedArrayFromButtonClicked(button.target());
+                        String[][] actualArray = getActualArray();
+                        for (int i = 0; i < NUM_OF_ROWS; i++) {
+                            for (int j = 0; j < NUM_OF_COLUMNS; j++) {
+                                assertEquals(expectedArray[i][j], actualArray[i][j],
+                                        "The text for the cell {0}{1} should be \"{2}\" " +
+                                                "but is instead \"{3}\"", (char) ('A' + j), NUM_OF_ROWS - i, expectedArray[i][j], actualArray[i][j]);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            checkColorOfCells(winConditions.indexOf(winCondition));
+        }
+        return correct();
+    }
+
+    @DynamicTest(feedback = "Clicking on any cell after the game has been won (before resetting) should do nothing")
+    CheckResult test12() {
+        buttonFixtures.forEach(button -> {
+            button.click();
+            String[][] actualArray = getActualArray();
+            for (int i = 0; i < NUM_OF_ROWS; i++) {
+                for (int j = 0; j < NUM_OF_COLUMNS; j++) {
+                    assertEquals(expectedArray[i][j], actualArray[i][j],
+                            "The text for the cell {0}{1} should be \"{2}\" " +
+                                    "but is instead \"{3}\"",  (char) ('A' + j), NUM_OF_ROWS - i, expectedArray[i][j], actualArray[i][j]);
+                }
+            }
+        });
+        return correct();
     }
 
     private static void assertEquals(
@@ -271,6 +352,98 @@ public class Connect4Test extends SwingTest {
                 "A3", buttonA3, "B3", buttonB3, "C3", buttonC3, "D3", buttonD3, "E3", buttonE3, "F3", buttonF3, "G3", buttonG3,
                 "A2", buttonA2, "B2", buttonB2, "C2", buttonC2, "D2", buttonD2, "E2", buttonE2, "F2", buttonF2, "G2", buttonG2,
                 "A1", buttonA1, "B1", buttonB1, "C1", buttonC1, "D1", buttonD1, "E1", buttonE1, "F1", buttonF1, "G1", buttonG1);
+    }
+
+    private List<int[]> winConditions() {
+        List<int[]> winConditions = new ArrayList<>();
+
+        int[] checkHorizontalX = {0, 1, 2, 3, 4, 5, 6, 0, 1, 0,
+                2, 0, 3, 6, 4};
+        int[] checkHorizontalO = {0, 1, 0, 2, 0, 3, 6, 4};
+        int[] checkVerticalX = {5, 6, 5, 6, 5, 6, 5};
+        int[] checkVerticalO = {2, 3, 2, 2, 3, 2, 3, 2, 3, 2};
+        int[] checkDiagonalX = {2, 3, 3, 4, 4, 5, 4, 5, 5, 0, 5};
+        int[] checkDiagonalO = {6, 6, 5, 5, 4, 5, 4, 3, 4, 4, 3,
+                3, 3, 3};
+
+        winConditions.add(checkHorizontalX);
+        winConditions.add(checkHorizontalO);
+        winConditions.add(checkVerticalX);
+        winConditions.add(checkVerticalO);
+        winConditions.add(checkDiagonalX);
+        winConditions.add(checkDiagonalO);
+
+        return winConditions;
+    }
+
+    private void checkColorOfCells(int indexOfWinCondition) {
+        Color baselineColor;
+        Color winningColor;
+        List<JButtonFixture> winningCells = new ArrayList<>();
+
+        switch (indexOfWinCondition) {
+            case 0:
+                baselineColor = buttonA1.target().getBackground();
+                winningColor = buttonB2.target().getBackground();
+                winningCells.add(buttonB2);
+                winningCells.add(buttonC2);
+                winningCells.add(buttonD2);
+                winningCells.add(buttonE2);
+                break;
+            case 1:
+                baselineColor = buttonA1.target().getBackground();
+                winningColor = buttonB1.target().getBackground();
+                winningCells.add(buttonB1);
+                winningCells.add(buttonC1);
+                winningCells.add(buttonD1);
+                winningCells.add(buttonE1);
+                break;
+            case 2:
+                baselineColor = buttonG1.target().getBackground();
+                winningColor = buttonF1.target().getBackground();
+                winningCells.add(buttonF1);
+                winningCells.add(buttonF2);
+                winningCells.add(buttonF3);
+                winningCells.add(buttonF4);
+                break;
+            case 3:
+                baselineColor = buttonC1.target().getBackground();
+                winningColor = buttonC6.target().getBackground();
+                winningCells.add(buttonC6);
+                winningCells.add(buttonC5);
+                winningCells.add(buttonC4);
+                winningCells.add(buttonC3);
+                break;
+            case 4:
+                baselineColor = buttonD1.target().getBackground();
+                winningColor = buttonC1.target().getBackground();
+                winningCells.add(buttonC1);
+                winningCells.add(buttonD2);
+                winningCells.add(buttonE3);
+                winningCells.add(buttonF4);
+                break;
+            case 5:
+                baselineColor = buttonG1.target().getBackground();
+                winningColor = buttonG2.target().getBackground();
+                winningCells.add(buttonG2);
+                winningCells.add(buttonF3);
+                winningCells.add(buttonE4);
+                winningCells.add(buttonD5);
+                break;
+            default:
+                throw new IndexOutOfBoundsException("Error in test checking color for win conditions");
+        }
+
+        for (JButtonFixture button:
+                buttonFixtures) {
+            if (winningCells.contains(button)) {
+                assertEquals(winningColor, button.target().getBackground(), "{0} should have the winning color: {1} " +
+                        "but is instead has the color {2}", button.target().getName(), winningColor, button.target().getBackground());
+            } else {
+                assertEquals(baselineColor, button.target().getBackground(), "{0} should have the baseline color: " +
+                        "{1} but instead has the color {2}", button.target().getName(), baselineColor, button.target().getBackground());
+            }
+        }
     }
 
     private static Map<String, JButtonFixture> mapOf(Object... keyValues) {
@@ -303,6 +476,7 @@ public class Connect4Test extends SwingTest {
         for (String[] array: expectedArray) {
             Arrays.fill(array, EMPTY_CELL);
         }
+        playerCount = 0;
     }
 
     private static String[][] getActualArray() {
