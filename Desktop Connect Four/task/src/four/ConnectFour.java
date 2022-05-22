@@ -6,36 +6,69 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 
+import static four.BoardChecker.checkRows;
+
 public class ConnectFour extends JFrame {
     JPanel board = new JPanel(new GridLayout(6, 7, 0, 0));
     char currentTurn = 'X';
+    int moves = 0;
+    boolean isWinner = false;
     ArrayList<ArrayList<JButton>> columns = new ArrayList<>();
     ArrayList<ArrayList<JButton>> rows = new ArrayList<>();
     ArrayList<ArrayList<JButton>> mainDiagonals = new ArrayList<>();
     ArrayList<ArrayList<JButton>> sideDiagonals = new ArrayList<>();
     ArrayList<JButton> buttons = new ArrayList<>();
     private final Dimension buttonDimensions = new Dimension(98, 98);
-    private final String BUTTONS = "Button";
+    private static final String BUTTONS_PREFIX = "Button";
 
 
     public ConnectFour() {
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setSize(700, 620);
+        setSize(700, 690);
         setLocationRelativeTo(null);
         setTitle("Connect 4");
+        setLayout(new BoxLayout(getContentPane(), BoxLayout.Y_AXIS));
         setResizable(false);
+        setBackground(Color.BLACK);
 
         addBoard();
+        addFooter();
 
         setVisible(true);
     }
 
     private void addBoard() {
+        board.setPreferredSize(new Dimension(600, 600));
+        board.setMinimumSize(new Dimension(600, 600));
         createButtons();
         createMainDiagonals();
         createSideDiagonals();
         add(board);
         addAction();
+    }
+
+    private void addFooter() {
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        JButton resetButton = new JButton("Reset");
+        resetButton.setName("ButtonReset");
+        resetButton.setPreferredSize(new Dimension(150, 50));
+        resetButton.setMaximumSize(new Dimension(150, 50));
+        resetButton.setBackground(Color.WHITE);
+        resetButton.setFont(new Font("Arial", Font.BOLD, 40));
+        resetButton.setFocusPainted(false);
+        footer.add(resetButton);
+        footer.setBackground(Color.BLACK);
+        add(footer);
+
+        resetButton.addActionListener(e -> {
+            moves = 0;
+            isWinner = false;
+            for (var button : buttons) {
+                button.setText(" ");
+                button.setBackground(Color.BLACK);
+                currentTurn = 'X';
+            }
+        });
     }
 
     private void createButtons() {
@@ -49,9 +82,9 @@ public class ConnectFour extends JFrame {
         int row = 0;
         for (int rowReversed = 6; rowReversed >= 1; rowReversed--) {
             for (char col = 'A'; col <= 'G'; col++) {
-                JButton button = new JButton(col + "" + rowReversed);
+                JButton button = new JButton(" ");
                 button.setFocusPainted(false);
-                button.setName(BUTTONS + col + "" + rowReversed);
+                button.setName(BUTTONS_PREFIX + col + "" + rowReversed);
                 button.setBackground(Color.BLACK);
                 button.setForeground(Color.CYAN);
                 button.setBorder(new LineBorder(Color.DARK_GRAY, 1, true));
@@ -78,7 +111,10 @@ public class ConnectFour extends JFrame {
                 button.addActionListener(e -> {
                     System.out.println(button.getName());
                     var currentColumn = columns.get(button.getName().charAt(6) - 65);
-                    addTextToButtons(currentColumn);
+                    if (!isWinner) {
+                        addTextToButtons(currentColumn);
+                    }
+                    checkWinner();
                 });
             }
         }
@@ -89,6 +125,7 @@ public class ConnectFour extends JFrame {
             if (button.getText().equals(" ")) {
                 System.out.println(button.getName());
                 button.setText(String.valueOf(currentTurn));
+                moves++;
                 if (currentTurn == 'X') {
                     currentTurn = 'O';
                 } else {
@@ -109,7 +146,7 @@ public class ConnectFour extends JFrame {
                 while (rowNumReversed >= 1) {
                     int finalRowNumReversed = rowNumReversed;
                     char finalCol = col;
-                    var optionalButton = rows.get(rowNum).stream().filter(b -> b.getName().equals(BUTTONS + finalCol + "" + finalRowNumReversed)).findFirst();
+                    var optionalButton = rows.get(rowNum).stream().filter(b -> b.getName().equals(BUTTONS_PREFIX + finalCol + "" + finalRowNumReversed)).findFirst();
                     optionalButton.ifPresent(diagonal::add);
                     rowNumReversed--;
                     rowNum++;
@@ -132,7 +169,7 @@ public class ConnectFour extends JFrame {
                 while (rowNumReversed <= 6) {
                     int finalRowNumReversed = rowNumReversed;
                     char finalCol = col;
-                    var optionalButton = rows.get(rowNum).stream().filter(b -> b.getName().equals(BUTTONS + finalCol + "" + finalRowNumReversed)).findFirst();
+                    var optionalButton = rows.get(rowNum).stream().filter(b -> b.getName().equals(BUTTONS_PREFIX + finalCol + "" + finalRowNumReversed)).findFirst();
                     optionalButton.ifPresent(diagonal::add);
                     rowNumReversed++;
                     rowNum--;
@@ -142,6 +179,12 @@ public class ConnectFour extends JFrame {
             if (diagonal.size() >= 4) {
                 sideDiagonals.add(diagonal);
             }
+        }
+    }
+
+    private void checkWinner() {
+        if ((moves >= 4) && (checkRows(rows) || checkRows(columns) || checkRows(mainDiagonals) || checkRows(sideDiagonals))) {
+            isWinner = true;
         }
     }
 }
